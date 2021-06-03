@@ -43,33 +43,37 @@ func (c *ShoppingCart) handleOffers(receipt *Receipt, offers map[Product]Special
 			var unitPrice = catalog.unitPrice(p)
 			var quantityAsInt = int(math.Round(quantity))
 			var discount *Discount = nil
-			var x = 1
-			if offer.offerType == ThreeForTwo {
-				x = 3
-
-			} else if offer.offerType == TwoForAmount {
-				x = 2
-				if quantityAsInt >= 2 {
-					var total = offer.argument * float64(quantityAsInt / x) + float64(quantityAsInt % 2) * unitPrice
-					var discountN = unitPrice * quantity - total;
-					discount = &Discount{product: p, description: fmt.Sprintf("2 for %.2f", offer.argument), discountAmount: -discountN}
+            var validBundle = offer.bundle.isValid(c.productQuantities)//TODO: validate if the prducs has only one item
+			if offer.bundle.bundled && validBundle {//if this is true then it will add a discount for the equivalent product. this is ok because (a+b)*x = ax + bx
+				var discountN = unitPrice * quantity * offer.argument /100;
+				discount = &Discount{product: p, description: fmt.Sprintf("part of a bundle"), discountAmount: -discountN}//i take advantage that discount.Product atribute is never used by the receipt
+			} else { //if no bundled just add other existing discounts, bundles and others discounts cant be aplied together
+				var x = 1
+				if offer.offerType == ThreeForTwo {
+					x = 3
+				} else if offer.offerType == TwoForAmount {
+					x = 2
+					if quantityAsInt >= 2 {
+						var total = offer.argument * float64(quantityAsInt / x) + float64(quantityAsInt % 2) * unitPrice
+						var discountN = unitPrice * quantity - total;
+						discount = &Discount{product: p, description: fmt.Sprintf("2 for %.2f", offer.argument), discountAmount: -discountN}
+					}
 				}
-
-			}
-			if offer.offerType == FiveForAmount {
-				x = 5
-			}
-			var numberOfXs int = quantityAsInt / x;
-			if offer.offerType == ThreeForTwo && quantityAsInt > 2 {
-				var discountAmount = quantity * unitPrice - (float64(numberOfXs * 2) * unitPrice + float64(quantityAsInt % 3) * unitPrice)
-				discount = &Discount{product: p, description: "3 for 2", discountAmount: -discountAmount}
-			}
-			if offer.offerType == TenPercentDiscount {
-				discount = &Discount{product: p, description: fmt.Sprintf("%.0f %% off", offer.argument), discountAmount: -quantity * unitPrice * offer.argument / 100.0}
-			}
-			if offer.offerType == FiveForAmount && quantityAsInt >= 5 {
-				var discountTotal = unitPrice * quantity - (offer.argument * float64(numberOfXs) + float64(quantityAsInt % 5) * unitPrice)
-				discount = &Discount{product: p, description: fmt.Sprintf("%d for %.2f", x, offer.argument), discountAmount: -discountTotal}
+				if offer.offerType == FiveForAmount {
+					x = 5
+				}
+				var numberOfXs int = quantityAsInt / x;
+				if offer.offerType == ThreeForTwo && quantityAsInt > 2 {
+					var discountAmount = quantity * unitPrice - (float64(numberOfXs * 2) * unitPrice + float64(quantityAsInt % 3) * unitPrice)
+					discount = &Discount{product: p, description: "3 for 2", discountAmount: -discountAmount}
+				}
+				if offer.offerType == TenPercentDiscount {
+					discount = &Discount{product: p, description: fmt.Sprintf("%.0f %% off", offer.argument), discountAmount: -quantity * unitPrice * offer.argument / 100.0}
+				}
+				if offer.offerType == FiveForAmount && quantityAsInt >= 5 {
+					var discountTotal = unitPrice * quantity - (offer.argument * float64(numberOfXs) + float64(quantityAsInt % 5) * unitPrice)
+					discount = &Discount{product: p, description: fmt.Sprintf("%d for %.2f", x, offer.argument), discountAmount: -discountTotal}
+				}
 			}
 			if discount != nil {
 				receipt.addDiscount(*discount)
